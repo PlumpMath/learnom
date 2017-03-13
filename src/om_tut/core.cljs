@@ -1,6 +1,8 @@
-(ns om-tut.core
+(ns ^:figwheel-always om-tut.core
+  (:require-macros [cljs.core.async.macros :refer [go]])
   (:require [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]))
+            [om.dom :as dom :include-macros true]
+            [cljs.core.async :refer [put! chan <!]]))
 
 (enable-console-print!)
 
@@ -53,11 +55,56 @@
 (defn display-name [{:keys [first last] :as contact}]
   (str last ", " first (middle-name contact)))
 
+;(defn contact-view [contact owner]
+;  (reify
+;    om/IRender
+;    (render [this]
+;      (dom/li nil
+;              (dom/span nil (display-name contact))
+;              (dom/button nil "Delete")))))
+
+;; This is a error stuff
 (defn contact-view [contact owner]
   (reify
-    om/IRender
-    (render [this]
-      (dom/li nil (display-name contact)))))
+    om/IRenderState
+    (render-state [this {:keys [delete]}]
+      (dom/li nil
+              (dom/span nil (display-name contact))
+              (dom/button #js {:onClick (fn [e] (put! delete @contact))} "Delete")))))
+
+(defn contacts-view [data owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:delete (chan)})
+    om/IWillMount
+    (will-mount [_]
+      (let [delete (om/get-state owner :delete)]
+        (go (loop []
+              (let [contact (<! delete)]
+                (om/transact! data :contacts
+                              (fn [xs] (vec (remove #(= contact %) xs))))
+                (recur))))))
+    om/IRenderState
+    (render-state [this {:keys [delete]}]
+      (dom/div nil
+               (dom/h2 nil "Contact list")
+               (apply dom/ul nil
+                      (om/build-all contact-view (:contacts data)
+                                    {:init-state {:delete delete}}))))))
+
+;(om/root
+;  (fn [data owner]
+;    (reify
+;      om/IRender
+;      (render [this]
+;        (dom/div nil
+;                 (dom/h2 nil "Contact list")
+;                 (apply dom/ul nil
+;                        (om/build-all contact-view (:contacts data)))))))
+;  app-state
+;  {:target (. js/document (getElementById "contacts"))})
+
 
 (om/root
   (fn [data owner]
@@ -65,9 +112,7 @@
       om/IRender
       (render [this]
         (dom/div nil
-                 (dom/h2 nil "Contact list")
-                 (apply dom/ul nil
-                        (om/build-all contact-view (:contacts data)))))))
+                 (om/build contacts-view data)))))
   app-state
   {:target (. js/document (getElementById "contacts"))})
 
