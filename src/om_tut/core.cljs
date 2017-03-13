@@ -31,9 +31,9 @@
                            {:type :professor :first "Hal" :last "Abelson" :email "evalapply@mit.edu"
                              :classes [:6001]}]
                           :classes
-                          {:6001 "The Structure and Interpretation of Computer Programs"
-                           :6946 "The Structure and Interpretation of Classical Mechanics"
-                           :1806 "Linear Algebra"}}))
+                          {:6001 ["The Structure and Interpretation of Computer Programs"]
+                           :6946 ["The Structure and Interpretation of Classical Mechanics"]
+                           :1806 ["Linear Algebra"]}}))
 
 ;; Using reify
 (om/root
@@ -202,7 +202,7 @@
        (mapv (fn [x]
                (if (:classes x)
                  (update-in x [:classes]
-                            (fn [y] (mapv (:classes data) y)))
+                            (fn [y] (mapv #(get ((:classes data) %) 0) y)))
                  x)))))
 
 (defn registry-view [data owner]
@@ -268,16 +268,6 @@
          {:target (. js/document (getElementById "editabletxt"))})
 
 ;; Editable classview
-;(extend-type string
-;  ICloneable
-;  (-clone [s] (js/String. s)))
-;
-;(extend-type js/String
-;  ICloneable
-;  (-clone [s] (js/String. s))
-;  om/IValue
-;  (-value [s] (str s)))
-
 (defn editable [text owner]
   (reify
     om/IInitState
@@ -288,15 +278,15 @@
       (dom/li nil
               (dom/span #js {:style (if (not editing)
                                       #js {}
-                                      #js {:display "none"})} text)
+                                      #js {:display "none"})} (get text 0))
               (dom/input
                 #js {:style (if editing
                               #js {}
                               #js {:display "none"})
-                     :value text
+                     :value (get text 0)
                      :onKeyDown #(when (= (.-key %) "Enter")
                                     (om/set-state! owner :editing false))
-                     :onChange #(om/transact! text (fn [_] (.. % -target -value)))})
+                     :onChange #(om/update! text (.. % -target -value))})
               (dom/button
                 #js {:style (if (not editing)
                               #js {}
