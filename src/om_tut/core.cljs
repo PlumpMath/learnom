@@ -75,14 +75,20 @@
               (== c 1) (assoc :middle-initial middle)
               (>= c 2) (assoc :middle middle)))))
 
-(defn add-contact [data owner]
-  (let [new-contact (-> (om/get-node owner "new-contact")
-                        .-value
-                        parse-contact)]
-    (when new-contact
-      (om/transact! data :contacts #(conj % new-contact)))))
+;(defn add-contact [data owner]
+;  (let [new-contact (-> (om/get-node owner "new-contact")
+;                        .-value
+;                        parse-contact)]
+;    (when new-contact
+;      (om/transact! data :contacts #(conj % new-contact)))))
 
-;; This is a error stuff
+(defn add-contact [data owner]
+  (let [input (om/get-node owner "new-contact")
+        new-contact (-> input .-value parse-contact)]
+    (when new-contact
+      (om/transact! data :contacts #(conj % new-contact))
+      (om/set-state! owner :text ""))))
+
 (defn contact-view [contact owner]
   (reify
     om/IRenderState
@@ -92,15 +98,21 @@
               (dom/button #js {:onClick (fn [e] (put! delete @contact))} "Delete")))))
 
 
+(defn handle-change [e owner {:keys [text]}]
+  (let [value (.. e -target -value)]
+    (if-not (re-find #"[0-9]" value)
+      (om/set-state! owner :text value)
+      (om/set-state! owner :text text))))
+
 ;Reminder: Notice that we're using vec to transform the result of remove (a lazy sequence)
 ;back into a vector, consistent with our aforementioned rule that state should only consist
 ;of associative data structures like maps and vectors.
-
 (defn contacts-view [data owner]
   (reify
     om/IInitState
     (init-state [_]
-      {:delete (chan)})
+      {:delete (chan)
+       :text ""})
     om/IWillMount
     (will-mount [_]
       (let [delete (om/get-state owner :delete)]
@@ -110,14 +122,15 @@
                               (fn [xs] (vec (remove #(= contact %) xs))))
                 (recur))))))
     om/IRenderState
-    (render-state [this {:keys [delete]}]
+    (render-state [this state]
       (dom/div nil
                (dom/h2 nil "Contact list")
                (apply dom/ul nil
                       (om/build-all contact-view (:contacts data)
-                                    {:init-state {:delete delete}}))
+                                    {:init-state state}))
                (dom/div nil
-                        (dom/input #js {:type "text" :ref "new-contact"})
+                        (dom/input #js {:type "text" :ref "new-contact" :value (:text state)
+                                        :onChange #(handle-change % owner state)})
                         (dom/button #js {:onClick #(add-contact data owner)} "Add contact"))))))
 
 ;(om/root
