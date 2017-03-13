@@ -11,7 +11,7 @@
 
 ;; define your app data so that it doesn't get over-written on reload
 
-(defonce app-state (atom {:text "Hello world!"
+(defonce app-state (atom {:text ["Hello world!"]
                           :list ["Lion" "Zebra" "Buffalo" "Antelope"]
                           :contacts
                           [{:first "Ben" :last "Bitdiddle" :email "benb@mit.edu"}
@@ -42,7 +42,7 @@
       om/IRender
       (render [_]
         (dom/div nil
-                 (dom/h1 nil (:text data))
+                 (dom/h1 nil (get (:text data) 0))
                  (dom/h3 nil "Edit this and watch it change!")
                  (apply dom/ul nil
                         (map (fn [text] (dom/li nil text)) (:list data)))))))
@@ -54,7 +54,7 @@
   (fn [data owner]
     (om/component
       (dom/div nil
-               (dom/h1 nil (:text data))
+               (dom/h1 nil (get (:text data) 0))
                (dom/h3 nil "Edit this and watch it change!")
                (apply dom/ul #js {:className "animals"}
                       (map (fn [text] (dom/li nil text)) (:list data))))))
@@ -229,27 +229,54 @@
 (om/root classes-view app-state
          {:target (. js/document (getElementById "classes"))})
 
+;; Editable text
+(defn texteditable [text owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:editing false})
+    om/IRenderState
+    (render-state [_ {:keys [editing]}]
+      (dom/li nil
+              (dom/span #js {:style (if (not editing)
+                                      #js {}
+                                      #js {:display "none"})} (get text 0))
+              (dom/input
+                #js {:style (if editing
+                              #js {}
+                              #js {:display "none"})
+                     :value (get text 0)
+                     :onKeyDown #(when (= (.-key %) "Enter")
+                                    (om/set-state! owner :editing false))
+                     :onChange #(om/update! text [0] (.. % -target -value))})
+              (dom/button
+                #js {:style (if (not editing)
+                              #js {}
+                              #js {:display "none"})
+                     :onClick #(om/set-state! owner :editing true)}
+                "Edit")))))
+
+(defn text-view [data owner]
+  (reify
+    om/IRender
+    (render [_]
+      (dom/div #js {:id "classes"}
+               (dom/h2 nil "Text")
+               (om/build texteditable (:text data))))))
+
+(om/root text-view app-state
+         {:target (. js/document (getElementById "editabletxt"))})
+
 ;; Editable classview
-(defn display1 [show]
-  (if show
-    #js {}
-    #js {:display "none"}))
-
-(defn handle-change1 [e text owner]
-  (om/transact! text (fn [_] (.. e -target -value))))
-
-(defn commit-change1 [text owner]
-  (om/set-state! owner :editing false))
-
-(extend-type string
-  ICloneable
-  (-clone [s] (js/String. s)))
-
-(extend-type js/String
-  ICloneable
-  (-clone [s] (js/String. s))
-  om/IValue
-  (-value [s] (str s)))
+;(extend-type string
+;  ICloneable
+;  (-clone [s] (js/String. s)))
+;
+;(extend-type js/String
+;  ICloneable
+;  (-clone [s] (js/String. s))
+;  om/IValue
+;  (-value [s] (str s)))
 
 (defn editable [text owner]
   (reify
@@ -259,16 +286,21 @@
     om/IRenderState
     (render-state [_ {:keys [editing]}]
       (dom/li nil
-              (dom/span #js {:style (display1 (not editing))} (om/value text))
+              (dom/span #js {:style (if (not editing)
+                                      #js {}
+                                      #js {:display "none"})} text)
               (dom/input
-                #js {:style (display1 editing)
-                     :value (om/value text)
-                     :onChange #(handle-change1 % text owner)
+                #js {:style (if editing
+                              #js {}
+                              #js {:display "none"})
+                     :value text
                      :onKeyDown #(when (= (.-key %) "Enter")
-                                   (commit-change1 text owner))
-                     :onBlur (fn [e] (commit-change1 text owner))})
+                                    (om/set-state! owner :editing false))
+                     :onChange #(om/transact! text (fn [_] (.. % -target -value)))})
               (dom/button
-                #js {:style (display1 (not editing))
+                #js {:style (if (not editing)
+                              #js {}
+                              #js {:display "none"})
                      :onClick #(om/set-state! owner :editing true)}
                 "Edit")))))
 
@@ -283,6 +315,7 @@
 
 (om/root classes-view1 app-state
          {:target (. js/document (getElementById "classes1"))})
+
 
 (defn on-js-reload [])
   ;; optionally touch your app-state to force rerendering depending on
