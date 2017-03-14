@@ -201,8 +201,7 @@
        :people
        (mapv (fn [x]
                (if (:classes x)
-                 (update-in x [:classes]
-                            (fn [y] (mapv #(get ((:classes data) %) 0) y)))
+                 (update-in x [:classes] (fn [y] (mapv #(get ((:classes data) %) 0) y)))
                  x)))))
 
 (defn registry-view [data owner]
@@ -224,7 +223,7 @@
       (dom/div #js {:id "classes"}
                (dom/h2 nil "Classes")
                (apply dom/ul nil
-                      (map #(dom/li nil %) (vals (:classes data))))))))
+                      (map #(dom/li nil %) (flatten (vals (:classes data)))))))))
 
 (om/root classes-view app-state
          {:target (. js/document (getElementById "classes"))})
@@ -267,7 +266,7 @@
 (om/root text-view app-state
          {:target (. js/document (getElementById "editabletxt"))})
 
-;; Editable classview
+; Editable classview
 (defn editable [text owner]
   (reify
     om/IInitState
@@ -286,7 +285,7 @@
                      :value (get text 0)
                      :onKeyDown #(when (= (.-key %) "Enter")
                                     (om/set-state! owner :editing false))
-                     :onChange #(om/update! text (.. % -target -value))})
+                     :onChange #(om/update! text [0] (.. % -target -value))})
               (dom/button
                 #js {:style (if (not editing)
                               #js {}
